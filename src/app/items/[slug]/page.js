@@ -1,17 +1,25 @@
 import ProductDetails from "./ProductDetails";
+import { fetchFullCatalog } from "@/lib/data-fetcher-server";
 
 export async function generateMetadata({ params }) {
     const { slug } = await params;
+    
+    // Fetch products catalog on the server to query actual brand/title
+    const products = await fetchFullCatalog();
+    const product = products.find((p) => p.slug === slug);
 
-    const productName = slug
+    const fallbackName = slug
         ?.replace(/-/g, " ")
         ?.replace(/\b\w/g, (c) => c.toUpperCase());
 
-    const title = `${productName} Supplier in India | Price, Dealer & Distributor | Central Biomedicals`;
+    const productName = product?.title || fallbackName;
+    const brandName = product?.brand || "Raj Biosis";
 
-    const description = `Buy ${productName} at best price in India. Trusted supplier, dealer and distributor of ${productName} for hospitals, laboratories, diagnostic centers, research institutes and healthcare facilities. Contact Central Biomedicals for latest quotation and product details.`;
+    const title = `${productName} Supplier in India | Price, Specs & Distributor | Raj Biosis`;
 
-    const url = `https://centralbiomedicals.com/items/${slug}`;
+    const description = `Buy ${productName} by ${brandName} at best price in India. Trusted supplier, dealer and distributor for hospitals, clinical laboratories and diagnostic centers. Contact Raj Biosis for quotes.`;
+
+    const url = `https://hemoglobinstrip.com/items/${slug}`;
 
     return {
         title,
@@ -39,7 +47,7 @@ export async function generateMetadata({ params }) {
             "Diagnostic Equipment",
             "Hospital Equipment",
             "Healthcare Equipment",
-            "Central Biomedicals",
+            "Raj Biosis",
         ],
 
         alternates: {
@@ -50,7 +58,7 @@ export async function generateMetadata({ params }) {
             title,
             description,
             url,
-            siteName: "Central Biomedicals",
+            siteName: "Raj Biosis",
             type: "website",
             locale: "en_IN",
         },
@@ -73,9 +81,10 @@ export async function generateMetadata({ params }) {
             },
         },
 
-        metadataBase: new URL("https://centralbiomedials.com"),
+        metadataBase: new URL("https://hemoglobinstrip.com"),
     };
 }
+
 
 export default async function Page({ params }) {
     const { slug } = await params;

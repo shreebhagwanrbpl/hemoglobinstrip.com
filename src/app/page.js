@@ -1,12 +1,17 @@
 "use client";
+
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
-import SectionTitle from "@/components/SectionTitle";
-import ServiceCard from "@/components/ServiceCard";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { fetchFullCatalog } from "@/lib/data-fetcher";
+
+import SectionTitle from "@/components/SectionTitle";
+import ServiceCard from "@/components/ServiceCard";
+
 import {
   Microscope,
   FlaskConical,
@@ -14,51 +19,164 @@ import {
   Stethoscope,
   Building2,
   ArrowRight,
-  CheckCircle2,
-  PhoneCall,
   Wrench,
   Activity,
-} from "lucide-react";
-
-import Image from "next/image";
-import {
-
-
-
   Truck,
+  Headphones,
 } from "lucide-react";
 
-const stats = [
-  {
-    number: "5000+",
-    title: "Happy Clients",
-    icon: Building2,
-  },
-  {
-    number: "3500+",
-    title: "Products",
-    icon: Microscope,
-  },
-  {
-    number: "10+",
-    title: "Years Experience",
-    icon: ShieldCheck,
-  },
-  {
-    number: "24/7",
-    title: "Support",
-    icon: Truck,
-  },
-];
+/* ==========================================================
+   HOME PRODUCT CARD
+========================================================== */
 
-export default function HeroSection({
+function HomeProductCard({
+  product,
+  district = null,
 }) {
-  const [services, setServices] = useState([]);
-  const [products, setProducts] = useState([]);
+  if (!product) return null;
+
+  const slug =
+    product.slug ||
+    product.productSlug ||
+    product.title
+      ?.toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-");
+
+  const productLink = district
+    ? `/${district}/items/${slug}`
+    : `/items/${slug}`;
+
+  let imageUrl = "/placeholder.png";
+
+  if (
+    Array.isArray(product.images) &&
+    product.images.length > 0
+  ) {
+    const firstImage = product.images[0];
+
+    if (typeof firstImage === "string") {
+      imageUrl = firstImage;
+    } else if (firstImage?.url) {
+      imageUrl = firstImage.url;
+    } else if (firstImage?.src) {
+      imageUrl = firstImage.src;
+    }
+  } else if (product.image) {
+    imageUrl = product.image;
+  } else if (product.imageUrl) {
+    imageUrl = product.imageUrl;
+  } else if (product.imageURL) {
+    imageUrl = product.imageURL;
+  }
+
+  return (
+    <div className="group flex h-full flex-col overflow-hidden rounded-[24px] border border-[#DDD6C2] bg-white shadow-md transition-all duration-300 hover:-translate-y-2 hover:shadow-xl hover:shadow-[#DDD6C2]">
+
+      {/* IMAGE */}
+
+      <Link href={productLink}>
+        <div className="relative flex h-[250px] items-center justify-center overflow-hidden bg-[#F8F6F2] p-6">
+
+          <Image
+            src={imageUrl}
+            alt={
+              product.title ||
+              "Biomedical Testing Products"
+            }
+            width={500}
+            height={400}
+            unoptimized
+            className="h-full w-full object-contain transition duration-500 group-hover:scale-105"
+          />
+
+        </div>
+      </Link>
+
+      {/* PRODUCT DETAILS */}
+
+      <div className="flex flex-1 flex-col p-6">
+
+        <Link href={productLink}>
+          <h3 className="line-clamp-2 min-h-[56px] text-xl font-bold leading-7 text-slate-900 transition-colors duration-300 group-hover:text-[#4B6E48]">
+            {product.title ||
+              "Biomedical Testing Products"}
+          </h3>
+        </Link>
+
+        {/* BRAND + MODEL */}
+
+        <div className="mt-5 space-y-2">
+
+          <div className="flex items-center gap-2">
+
+            <span className="shrink-0 text-sm font-semibold text-slate-500">
+              Brand:
+            </span>
+
+            <span className="line-clamp-1 text-sm font-semibold text-[#3F5D3C]">
+              {product.brand || "N/A"}
+            </span>
+
+          </div>
+
+          <div className="flex items-center gap-2">
+
+            <span className="shrink-0 text-sm font-semibold text-slate-500">
+              Model:
+            </span>
+
+            <span className="line-clamp-1 text-sm font-medium text-slate-700">
+              {product.model || "N/A"}
+            </span>
+
+          </div>
+
+        </div>
+
+        {/* BUTTON */}
+
+        <div className="mt-auto pt-6">
+
+          <Link
+            href={productLink}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#4B6E48] px-5 py-3 font-semibold !text-white transition-all duration-300 hover:bg-[#3F5D3C] hover:shadow-lg hover:shadow-[#B2AC88]"
+          >
+
+            <span className="!text-white">
+              View Details
+            </span>
+
+            <ArrowRight
+              size={17}
+              className="!text-white"
+            />
+
+          </Link>
+
+        </div>
+
+      </div>
+
+    </div>
+  );
+}
+
+
+/* ==========================================================
+   HOME PAGE
+========================================================== */
+
+export default function HomePage() {
+
   const pathname = usePathname();
 
-  const pathParts = pathname.split("/").filter(Boolean);
+  const [services, setServices] = useState([]);
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [productsLoading, setProductsLoading] =
+    useState(true);
 
   const [heroData, setHeroData] = useState({
     title: "",
@@ -66,6 +184,15 @@ export default function HeroSection({
     button1Text: "",
     button2Text: "",
   });
+
+
+  /* ========================================================
+     CITY / DISTRICT
+  ======================================================== */
+
+  const pathParts =
+    pathname?.split("/").filter(Boolean) || [];
+
   const staticRoutes = [
     "about",
     "services",
@@ -73,33 +200,54 @@ export default function HeroSection({
     "contact",
   ];
 
-  const district =
+  const currentDistrict =
     pathParts.length > 0 &&
       !staticRoutes.includes(pathParts[0])
       ? pathParts[0]
       : "";
-  const city = district
-    ? district
-      .replace(/-/g, " ")
-      .replace(/\b\w/g, (c) => c.toUpperCase())
-    : "";
-  const makeLink = (path) => {
-    if (!district) return path;
 
-    if (path === "/") {
-      return `/${district}`;
+  const currentCity = currentDistrict
+    ? currentDistrict
+      .replace(/-/g, " ")
+      .replace(/\b\w/g, (char) =>
+        char.toUpperCase()
+      )
+    : "";
+
+
+  /* ========================================================
+     LINK HANDLER
+  ======================================================== */
+
+  const makeLink = (path) => {
+
+    if (!currentDistrict) {
+      return path;
     }
 
-    return `/${district}${path}`;
+    if (path === "/") {
+      return `/${currentDistrict}`;
+    }
+
+    return `/${currentDistrict}${path}`;
   };
+
+
+  /* ========================================================
+     LOAD HERO DATA
+  ======================================================== */
+
   useEffect(() => {
-    const fetchHeroData = async () => {
+
+    const loadHero = async () => {
+
       try {
+
         const snap = await getDoc(
           doc(
             db,
             "websites",
-            "centralbiomedicals",
+            "hemoglobinstripcom",
             "pages",
             "home"
           )
@@ -108,526 +256,696 @@ export default function HeroSection({
         if (snap.exists()) {
           setHeroData(snap.data());
         }
-      } catch (err) {
-        console.error(err);
+
+      } catch (error) {
+
+        console.error(
+          "Hero data error:",
+          error
+        );
+
       } finally {
+
         setLoading(false);
+
       }
+
     };
 
-    fetchHeroData();
+    loadHero();
+
   }, []);
+
+
+  /* ========================================================
+     LOAD SERVICES + PRODUCTS
+  ======================================================== */
+
   useEffect(() => {
-    const fetchData = async () => {
+
+    const loadHomeData = async () => {
+
       try {
 
-        // Services
+        /* SERVICES */
 
         const serviceSnap = await getDoc(
           doc(
             db,
             "websites",
-            "centralbiomedicals",
+            "hemoglobinstripcom",
             "pages",
             "services"
           )
         );
 
         if (serviceSnap.exists()) {
-          setServices(serviceSnap.data().services || []);
+
+          const serviceData =
+            serviceSnap.data();
+
+          setServices(
+            Array.isArray(
+              serviceData.services
+            )
+              ? serviceData.services
+              : []
+          );
+
         }
 
-        // Products
 
-        const productSnap = await getDoc(
-          doc(
-            db,
-            "websites",
-            "centralbiomedicals",
-            "pages",
-            "products"
-          )
+        /* PRODUCTS */
+
+        const allProducts =
+          await fetchFullCatalog();
+
+        const normalizedProducts =
+          Array.isArray(allProducts)
+            ? allProducts.map((product) => ({
+              ...product,
+
+              slug:
+                product.slug ||
+                product.productSlug ||
+                product.title
+                  ?.toLowerCase()
+                  .trim()
+                  .replace(
+                    /[^a-z0-9\s-]/g,
+                    ""
+                  )
+                  .replace(
+                    /\s+/g,
+                    "-"
+                  ),
+            }))
+            : [];
+
+        setProducts(
+          normalizedProducts
         );
 
-        if (productSnap.exists()) {
+      } catch (error) {
 
-          const data = (productSnap.data().products || []).map((item) => ({
-            ...item,
-            slug:
-              item.slug ||
-              item.title
-                ?.toLowerCase()
-                .trim()
-                .replace(/[^a-z0-9\s-]/g, "")
-                .replace(/\s+/g, "-"),
-          }));
+        console.error(
+          "Home data error:",
+          error
+        );
 
-          setProducts(data);
+      } finally {
 
-        }
+        setProductsLoading(false);
 
-      } catch (err) {
-        console.error(err);
       }
+
     };
 
-    fetchData();
+    loadHomeData();
+
   }, []);
-  const icons = [
-    <Microscope size={30} />,
-    <FlaskConical size={30} />,
-    <ShieldCheck size={30} />,
-    <Stethoscope size={30} />,
-    <Wrench size={30} />,
-    <Activity size={30} />,
+
+
+  /* ========================================================
+     ONLY 3 PRODUCTS
+  ======================================================== */
+
+  const featuredProducts = products
+    .filter(
+      (product) =>
+        product &&
+        product.title
+    )
+    .slice(0, 3);
+
+
+  /* ========================================================
+     ONLY 3 SERVICES
+  ======================================================== */
+
+  const featuredServices = services
+    .filter(Boolean)
+    .slice(0, 3);
+
+
+  /* ========================================================
+     SERVICE ICONS
+  ======================================================== */
+
+  const serviceIcons = [
+    <Microscope
+      key="microscope"
+      size={30}
+    />,
+    <FlaskConical
+      key="flask"
+      size={30}
+    />,
+    <ShieldCheck
+      key="shield"
+      size={30}
+    />,
+    <Stethoscope
+      key="stethoscope"
+      size={30}
+    />,
+    <Wrench
+      key="wrench"
+      size={30}
+    />,
+    <Activity
+      key="activity"
+      size={30}
+    />,
   ];
+
+
   return (
     <>
-  <section className="relative overflow-hidden bg-gradient-to-br from-[#F2F0EF] via-white to-[#B2AC88]/20">
 
-  {/* Background Blur */}
-  <div className="absolute -top-40 -right-40 h-[500px] w-[500px] rounded-full bg-[#B2AC88]/30 blur-[150px]" />
-  <div className="absolute -bottom-40 -left-40 h-[500px] w-[500px] rounded-full bg-[#4B6E48]/20 blur-[150px]" />
+      {/* ====================================================
+          HERO BANNER
+      ==================================================== */}
+      <section className="bg-white px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
 
-  <div className="container-custom relative py-24">
+        <div className="mx-auto max-w-[1450px]">
 
-    <div className="grid lg:grid-cols-2 gap-16 items-center">
-
-      {/* Left */}
-      <motion.div
-        initial={{ opacity: 0, y: 60 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8 }}
-      >
-
-        {/* Badge */}
-        <span className="inline-flex items-center rounded-full border border-[#B2AC88]/50 bg-[#B2AC88]/15 px-5 py-2 text-sm font-semibold text-[#4B6E48] backdrop-blur-sm">
-          India's Trusted Biomedical Partner
-        </span>
-
-        {/* Heading */}
-        <h1 className="mt-8 text-5xl lg:text-7xl font-black leading-tight text-[#2F3E2E]">
-
-          {loading ? (
-            <div className="space-y-4 animate-pulse">
-              <div className="h-12 w-3/4 rounded bg-[#DDD6C2]" />
-              <div className="h-12 w-2/3 rounded bg-[#DDD6C2]" />
-            </div>
-          ) : (
-            <>
-              {heroData.title}
-
-              {city && (
-                <span className="block mt-3 text-2xl lg:text-4xl font-bold text-[#4B6E48]">
-                  in {city}
-                </span>
-              )}
-            </>
-          )}
-
-        </h1>
-
-        {/* Description */}
-        {loading ? (
-          <div className="mt-8 space-y-3 animate-pulse">
-            <div className="h-4 rounded bg-[#DDD6C2]" />
-            <div className="h-4 w-11/12 rounded bg-[#DDD6C2]" />
-            <div className="h-4 w-8/12 rounded bg-[#DDD6C2]" />
-          </div>
-        ) : (
-          <p className="mt-8 max-w-xl text-lg leading-8 text-[#666666]">
-
-            {heroData.description}
-
-            {city && (
-              <>
-                {" "}
-                across <strong className="text-[#4B6E48]">{city}</strong>
-              </>
-            )}
-
-          </p>
-        )}
-
-        {/* Buttons */}
-        <div className="mt-10 flex flex-wrap gap-5">
-
-          {loading ? (
-            <>
-              <div className="h-14 w-48 rounded-xl bg-[#DDD6C2] animate-pulse" />
-              <div className="h-14 w-40 rounded-xl bg-[#DDD6C2] animate-pulse" />
-            </>
-          ) : (
-            <>
-              <Link href={makeLink("/items")}>
-
-                <button className="rounded-xl bg-[#4B6E48] px-8 py-4 font-semibold text-white shadow-xl shadow-[#4B6E48]/20 transition-all duration-300 hover:-translate-y-1 hover:bg-[#3F5D3C]">
-                  {heroData.button1Text || "Explore Products"}
-                </button>
-
-              </Link>
-
-              <Link href={makeLink("/contact")}>
-
-                <button className="rounded-xl border-2 border-[#4B6E48] bg-white px-8 py-4 font-semibold text-[#4B6E48] transition-all duration-300 hover:bg-[#B2AC88]/15">
-                  {heroData.button2Text || "Get Quote"}
-                </button>
-
-              </Link>
-            </>
-          )}
-
-        </div>
-
-      </motion.div>
-
-      {/* Right */}
-      <motion.div
-        initial={{ opacity: 0, y: 60 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-      >
-
-        <div className="grid grid-cols-2 gap-6">
-
-          {/* Card 1 */}
-          <div className="rounded-[32px] border border-[#DDD6C2] bg-white p-8 shadow-[0_20px_60px_rgba(0,0,0,0.08)]">
-
-            <h2 className="text-5xl font-black text-[#4B6E48]">
-              5000+
-            </h2>
-
-            <p className="mt-3 text-[#666666]">
-              Happy Customers
-            </p>
-
-          </div>
-
-          {/* Card 2 */}
-          <div className="rounded-[32px] bg-[#4B6E48] p-8 text-white shadow-[0_20px_60px_rgba(75,110,72,0.25)]">
-
-            <h2 className="text-5xl font-black">
-              10+
-            </h2>
-
-            <p className="mt-3 text-white/90">
-              Years Experience
-            </p>
-
-          </div>
-
-          {/* Why Choose */}
-          <div className="col-span-2 rounded-[32px] border border-[#DDD6C2] bg-white p-8 shadow-[0_20px_60px_rgba(0,0,0,0.08)]">
-
-            <h3 className="text-2xl font-bold text-[#2F3E2E]">
-              Why Customers Choose Us
-            </h3>
-
-            <div className="mt-8 space-y-6">
-
-              <div className="flex items-center gap-4">
-
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#B2AC88]/20 text-2xl">
-                  ✅
-                </div>
-
-                <div>
-                  <h4 className="font-semibold text-[#2F3E2E]">
-                    Premium Quality
-                  </h4>
-
-                  <p className="text-sm text-[#777777]">
-                    Genuine biomedical equipment.
-                  </p>
-                </div>
-
-              </div>
-
-              <div className="flex items-center gap-4">
-
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#B2AC88]/20 text-2xl">
-                  🚚
-                </div>
-
-                <div>
-                  <h4 className="font-semibold text-[#2F3E2E]">
-                    Fast Delivery
-                  </h4>
-
-                  <p className="text-sm text-[#777777]">
-                    Delivery across India.
-                  </p>
-                </div>
-
-              </div>
-
-              <div className="flex items-center gap-4">
-
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#B2AC88]/20 text-2xl">
-                  🛠
-                </div>
-
-                <div>
-                  <h4 className="font-semibold text-[#2F3E2E]">
-                    Service Support
-                  </h4>
-
-                  <p className="text-sm text-[#777777]">
-                    Installation & maintenance.
-                  </p>
-                </div>
-
-              </div>
-
-            </div>
-
-          </div>
-
-        </div>
-
-      </motion.div>
-
-    </div>
-
-  </div>
-
-</section>
-
-  <section className="bg-[#F2F0EF] py-20">
-
-  <div className="container-custom">
-
-    {/* Heading */}
-    <motion.div
-      initial={{ opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      transition={{ duration: .6 }}
-      viewport={{ once: true }}
-      className="text-center"
-    >
-
-      <span className="inline-flex rounded-full border border-[#B2AC88]/40 bg-[#B2AC88]/15 px-5 py-2 text-sm font-semibold text-[#4B6E48]">
-
-        TRUSTED ACROSS INDIA
-
-      </span>
-
-      <h2 className="mt-6 text-4xl lg:text-5xl font-black leading-tight text-[#2F3E2E]">
-
-        Trusted By Hospitals,
-        <br />
-        Laboratories & Healthcare Professionals
-
-      </h2>
-
-      <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-[#666666]">
-
-        Delivering reliable biomedical equipment with quality,
-        innovation and nationwide service support.
-
-      </p>
-
-    </motion.div>
-
-    {/* Stats */}
-    <div className="mt-16 grid gap-8 md:grid-cols-2 xl:grid-cols-4">
-
-      {stats.map((item, index) => {
-
-        const Icon = item.icon;
-
-        return (
+          {/* =====================================================
+        TOP CONTENT
+    ===================================================== */}
 
           <motion.div
-            key={index}
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * .15 }}
-            viewport={{ once: true }}
-            className="group rounded-[32px] border border-[#DDD6C2] bg-white p-8 shadow-[0_20px_60px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-[#4B6E48] hover:bg-[#4B6E48]"
+            initial={{ opacity: 0, y: 25 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7 }}
+            className="mx-auto max-w-4xl text-center"
           >
 
-            {/* Icon */}
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#B2AC88]/20 transition-all duration-300 group-hover:bg-white">
+            {/* LABEL */}
 
-              <Icon
-                size={30}
-                className="text-[#4B6E48]"
-              />
+            <div className="mx-auto mb-5 inline-flex items-center gap-2 rounded-full border border-[#DDD6C2] bg-[#F8F6F2] px-5 py-2 text-xs font-bold uppercase tracking-[0.15em] text-[#4B6E48] sm:text-sm">
+
+              <span className="h-2 w-2 rounded-full bg-[#4B6E48]" />
+
+              Hemoglobin Testing Essentials
 
             </div>
 
-            {/* Number */}
-            <h3 className="mt-8 text-5xl font-black text-[#2F3E2E] transition-colors duration-300 group-hover:text-white">
 
-              {item.number}
+            {/* TITLE */}
 
-            </h3>
+            {loading ? (
 
-            {/* Title */}
-            <p className="mt-4 text-[#666666] transition-colors duration-300 group-hover:text-white/90">
+              <div className="mx-auto animate-pulse space-y-3">
 
-              {item.title}
+                <div className="mx-auto h-12 w-[90%] rounded-2xl bg-[#F8F6F2] sm:h-16" />
+
+                <div className="mx-auto h-12 w-[65%] rounded-2xl bg-[#F8F6F2] sm:h-16" />
+
+              </div>
+
+            ) : (
+
+              <h1 className="text-4xl font-black leading-[1.02] tracking-tight text-slate-900 sm:text-5xl md:text-6xl lg:text-7xl">
+
+                {heroData.title ||
+                  "Practical Solutions For Everyday Diagnostics"}
+
+              </h1>
+
+            )}
+
+
+            {/* CITY */}
+
+            {currentCity && (
+
+              <div className="mt-5 flex items-center justify-center gap-2">
+
+                <span className="h-2 w-2 rounded-full bg-[#4B6E48]" />
+
+                <p className="text-base font-bold text-[#4B6E48] sm:text-lg">
+
+                  Serving Healthcare Professionals in{" "}
+
+                  {currentCity}
+
+                </p>
+
+              </div>
+
+            )}
+
+
+            {/* DESCRIPTION */}
+
+            <p className="mx-auto mt-6 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base sm:leading-8">
+
+              {heroData.description ||
+                "Explore hemoglobin testing products, laboratory essentials and procurement support designed around routine diagnostic requirements."}
 
             </p>
+
+
+            {/* BUTTONS */}
+
+            <div className="mt-7 flex flex-wrap justify-center gap-3">
+
+              <Link
+                href={makeLink("/items")}
+                className="inline-flex items-center gap-2 rounded-xl bg-[#4B6E48] px-7 py-3.5 font-semibold !text-white shadow-lg shadow-[#4B6E48]/20 transition-all duration-300 hover:-translate-y-1 hover:bg-[#3F5D3C] hover:shadow-xl"
+              >
+
+                <span className="!text-white">
+
+                  {heroData.button1Text ||
+                    "Browse Testing Products"}
+
+                </span>
+
+                <ArrowRight
+                  size={18}
+                  className="!text-white"
+                />
+
+              </Link>
+
+
+              <Link
+                href={makeLink("/contact")}
+                className="inline-flex items-center gap-2 rounded-xl border border-[#4B6E48] bg-white px-7 py-3.5 font-semibold text-[#4B6E48] transition-all duration-300 hover:-translate-y-1 hover:bg-[#F8F6F2]"
+              >
+
+                {heroData.button2Text ||
+                  "Discuss Your Requirement"}
+
+              </Link>
+
+            </div>
 
           </motion.div>
 
-        );
 
-      })}
+          {/* =====================================================
+        IMAGE SHOWCASE
+    ===================================================== */}
 
-    </div>
+          <motion.div
+            initial={{ opacity: 0, y: 45 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              delay: 0.2,
+              duration: 0.8,
+            }}
+            className="relative mx-auto mt-10 max-w-6xl"
+          >
 
-  </div>
+            {/* TOP LINE */}
 
-</section>
+            <div className="mb-3 flex items-center justify-between">
 
-    <section className="section-padding bg-gradient-to-b from-[#F2F0EF] via-white to-[#B2AC88]/10">
+              <div className="flex items-center gap-2">
 
-  <div className="container-custom">
+                <span className="h-2 w-2 rounded-full bg-[#4B6E48]" />
 
-    <SectionTitle
-      badge="Our Services"
-      title="Professional Biomedical Services"
-      description="Comprehensive biomedical solutions for hospitals, laboratories and healthcare institutions."
-      center
-    />
+                <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                  Laboratory Testing Essentials
+                </span>
 
-    <div className="mt-16 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+              </div>
 
-      {services.slice(0, 3).map((service, index) => (
 
-        <motion.div
-          key={index}
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ delay: index * 0.15 }}
-          viewport={{ once: true }}
-          className="group rounded-[32px] border border-[#DDD6C2] bg-white p-8 shadow-[0_20px_60px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-[#4B6E48] hover:bg-[#4B6E48]"
-        >
+              <span className="hidden text-xs font-semibold text-[#4B6E48] sm:block">
+                Reliable Diagnostic Supplies
+              </span>
 
-          {/* Icon */}
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#B2AC88]/20 transition-all duration-300 group-hover:bg-white">
+            </div>
 
-            {/* {React.createElement(icons[index], {
-              size: 30,
-              className: "text-[#4B6E48]",
-            })} */}
 
-          </div>
+            {/* IMAGE FRAME */}
 
-          {/* Title */}
-          <h3 className="mt-8 text-2xl font-bold text-[#2F3E2E] transition-colors duration-300 group-hover:text-white">
+            <div className="relative overflow-hidden rounded-[32px] border border-[#DDD6C2] bg-[#F8F6F2] shadow-[0_25px_70px_rgba(75,110,72,0.12)]">
 
-            {service.title}
+              {/* LEFT GREEN STRIP */}
 
-          </h3>
+              <div className="absolute bottom-0 left-0 top-0 w-2 bg-[#4B6E48] sm:w-3" />
 
-          {/* Description */}
-          <p className="mt-4 leading-7 text-[#666666] transition-colors duration-300 group-hover:text-white/90">
 
-            {service.desc}
+              {/* IMAGE */}
 
-          </p>
+              <div className="relative flex h-[300px] items-center justify-center px-8 py-6 sm:h-[370px] sm:px-12 lg:h-[430px]">
 
-        </motion.div>
+                <Image
+                  src="/home.png"
+                  alt="Biomedical Testing Products and Diagnostic Procurement"
+                  width={1400}
+                  height={850}
+                  priority
+                  className="h-full w-full object-contain transition duration-700 hover:scale-105"
+                />
 
-      ))}
+              </div>
 
-    </div>
 
-    {/* Button */}
-    <div className="mt-16 text-center">
+              {/* TOP RIGHT BADGE */}
 
-      <Link href={makeLink("/services")}>
+              <div className="absolute right-4 top-4 rounded-xl border border-[#DDD6C2] bg-white px-4 py-3 shadow-lg sm:right-6 sm:top-6">
 
-        <button className="inline-flex items-center gap-3 rounded-2xl bg-[#4B6E48] px-8 py-4 font-semibold text-white shadow-xl shadow-[#4B6E48]/20 transition-all duration-300 hover:-translate-y-1 hover:bg-[#3F5D3C]">
+                <div className="flex items-center gap-3">
 
-          View All Services
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#4B6E48]">
 
-          <ArrowRight size={18} />
+                    <ShieldCheck
+                      size={18}
+                      className="text-white"
+                    />
 
-        </button>
+                  </div>
 
-      </Link>
+                  <div>
 
-    </div>
+                    <p className="text-xs font-bold text-slate-900">
+                      Consistent Quality
+                    </p>
 
-  </div>
+                    <p className="text-[10px] text-slate-500">
+                      Practical Products
+                    </p>
 
-</section>
+                  </div>
 
-     <section className="section-padding bg-gradient-to-b from-[#F2F0EF] via-white to-[#B2AC88]/10">
+                </div>
 
-  <div className="container-custom">
+              </div>
 
-    <SectionTitle
-      badge="Featured Products"
-      title="Popular Biomedical Equipment"
-      description="Explore our most demanded biomedical and diagnostic equipment."
-      center
-    />
 
-    <div className="mt-16 grid gap-8 md:grid-cols-2 xl:grid-cols-3">
+              {/* BOTTOM INFO */}
 
-      {products.slice(0, 3).map((product) => (
+              <div className="absolute bottom-4 left-5 right-5 rounded-2xl border border-white/80 bg-white/95 px-4 py-3 shadow-xl backdrop-blur-md sm:bottom-6 sm:left-7 sm:right-auto sm:min-w-[330px]">
 
-        <div
-          key={product.slug || product.id || product.title}
-          className="group overflow-hidden rounded-[32px] border border-[#DDD6C2] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-[#4B6E48] hover:shadow-[0_25px_70px_rgba(75,110,72,0.18)]"
-        >
+                <div className="flex items-center justify-between gap-5">
 
-          {/* Product Image */}
+                  <div>
 
-          <div className="flex h-72 items-center justify-center overflow-hidden bg-gradient-to-br from-[#F2F0EF] to-[#B2AC88]/10 p-8">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#4B6E48]">
+                      Diagnostic Procurement
+                    </p>
 
-            <img
-              src={product.images?.[0] || product.image}
-              alt={product.title}
-              className="max-h-56 object-contain transition-all duration-500 group-hover:scale-110"
-            />
+                    <p className="mt-1 text-sm font-bold text-slate-900 sm:text-base">
+                      Better Resources For Routine Testing
+                    </p>
 
-          </div>
+                  </div>
 
-          {/* Content */}
 
-          <div className="p-8">
+                  <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F8F6F2] text-[#4B6E48] sm:flex">
 
-            {/* Category */}
+                    <Activity size={20} />
 
-            <span className="inline-flex rounded-full border border-[#B2AC88]/40 bg-[#B2AC88]/15 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#4B6E48]">
+                  </div>
 
-              {product.category}
+                </div>
 
+              </div>
+
+            </div>
+
+
+            {/* ===================================================
+          STATS BELOW IMAGE
+      =================================================== */}
+
+            <div className="grid grid-cols-2 border-b border-[#DDD6C2] sm:grid-cols-4">
+
+              <div className="border-b border-[#DDD6C2] px-4 py-4 sm:border-b-0 sm:border-r">
+
+                <p className="text-2xl font-black text-[#4B6E48]">
+                  5000+
+                </p>
+
+                <p className="mt-1 text-xs text-slate-500">
+                  Happy Clients
+                </p>
+
+              </div>
+
+
+              <div className="border-b border-[#DDD6C2] px-4 py-4 sm:border-b-0 sm:border-r">
+
+                <p className="text-2xl font-black text-[#4B6E48]">
+                  3500+
+                </p>
+
+                <p className="mt-1 text-xs text-slate-500">
+                  Products
+                </p>
+
+              </div>
+
+
+              <div className="border-b border-[#DDD6C2] px-4 py-4 sm:border-b-0 sm:border-r">
+
+                <p className="text-2xl font-black text-[#4B6E48]">
+                  10+
+                </p>
+
+                <p className="mt-1 text-xs text-slate-500">
+                  Years Experience
+                </p>
+
+              </div>
+
+
+              <div className="px-4 py-4">
+
+                <p className="text-2xl font-black text-[#4B6E48]">
+                  24/7
+                </p>
+
+                <p className="mt-1 text-xs text-slate-500">
+                  Enquiry Support
+                </p>
+
+              </div>
+
+            </div>
+
+          </motion.div>
+
+        </div>
+
+      </section>
+
+
+      {/* ====================================================
+          TRUST
+      ==================================================== */}
+
+      <section className="bg-white py-20">
+
+        <div className="container-custom">
+
+          <div className="text-center">
+
+            <span className="rounded-full bg-[#F8F6F2] px-5 py-2 text-sm font-semibold text-[#3F5D3C]">
+              SUPPORTING TESTING WORKFLOWS
             </span>
 
-            {/* Title */}
+            <h2 className="mt-5 text-4xl font-black text-slate-900">
+              Chosen By Laboratories & Healthcare Teams
+            </h2>
 
-            <h3 className="mt-5 text-2xl font-bold leading-snug text-[#2F3E2E] transition-colors duration-300 group-hover:text-[#4B6E48]">
-
-              {product.title}
-
-            </h3>
-
-            {/* Description */}
-
-            <p className="mt-4 line-clamp-3 leading-7 text-[#666666]">
-
-              {product.description || product.desc}
-
+            <p className="mx-auto mt-5 max-w-3xl leading-8 text-slate-600">
+              Delivering reliable biomedical equipment with quality,
+              innovation and professional service support.
             </p>
 
-            {/* Button */}
+          </div>
+
+
+          <div className="mt-16 grid gap-8 md:grid-cols-2 xl:grid-cols-4">
+
+            {[
+              {
+                number: "5000+",
+                title: "Happy Clients",
+                icon: Building2,
+              },
+              {
+                number: "3500+",
+                title: "Products",
+                icon: Microscope,
+              },
+              {
+                number: "10+",
+                title: "Years Experience",
+                icon: ShieldCheck,
+              },
+              {
+                number: "24/7",
+                title: "Enquiry Support",
+                icon: Truck,
+              },
+            ].map((item, index) => {
+
+              const Icon = item.icon;
+
+              return (
+                <motion.div
+                  key={index}
+                  initial={{
+                    opacity: 0,
+                    y: 40,
+                  }}
+                  whileInView={{
+                    opacity: 1,
+                    y: 0,
+                  }}
+                  transition={{
+                    delay: index * 0.15,
+                  }}
+                  viewport={{
+                    once: true,
+                  }}
+                  className="group rounded-3xl border border-[#DDD6C2] bg-[#F8F6F2] p-8 transition duration-300 hover:-translate-y-2 hover:bg-[#4B6E48] hover:text-white"
+                >
+
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow">
+
+                    <Icon
+                      size={30}
+                      className="text-[#4B6E48]"
+                    />
+
+                  </div>
+
+                  <h3 className="mt-8 text-5xl font-black">
+                    {item.number}
+                  </h3>
+
+                  <p className="mt-3 text-slate-600 group-hover:text-white">
+                    {item.title}
+                  </p>
+
+                </motion.div>
+              );
+
+            })}
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+      {/* ====================================================
+          FEATURED PRODUCTS
+      ==================================================== */}
+
+      <section className="section-padding bg-white">
+
+        <div className="container-custom">
+
+          <SectionTitle
+            badge="Featured Products"
+            title="Featured Testing Products"
+            description="Review a selection of products from our broader hemoglobin testing and laboratory catalogue."
+            center
+          />
+
+
+          {/* LOADING */}
+
+          {productsLoading ? (
+
+            <div className="mt-16 grid gap-8 md:grid-cols-2 xl:grid-cols-3">
+
+              {Array.from({
+                length: 3,
+              }).map((_, index) => (
+
+                <div
+                  key={index}
+                  className="animate-pulse overflow-hidden rounded-[24px] border border-[#DDD6C2] bg-white shadow-md"
+                >
+
+                  <div className="h-[250px] bg-[#F8F6F2]" />
+
+                  <div className="p-6">
+
+                    <div className="h-7 w-4/5 rounded bg-[#F8F6F2]" />
+
+                    <div className="mt-5 h-4 w-3/5 rounded bg-[#F8F6F2]" />
+
+                    <div className="mt-3 h-4 w-2/3 rounded bg-[#F8F6F2]" />
+
+                    <div className="mt-6 h-12 w-full rounded-xl bg-[#F8F6F2]" />
+
+                  </div>
+
+                </div>
+
+              ))}
+
+            </div>
+
+          ) : featuredProducts.length > 0 ? (
+
+            <div className="mt-16 grid gap-8 md:grid-cols-2 xl:grid-cols-3">
+
+              {featuredProducts.map(
+                (product) => (
+
+                  <HomeProductCard
+                    key={
+                      product.uid ||
+                      product.slug ||
+                      product.id ||
+                      product.title
+                    }
+                    product={product}
+                    district={
+                      currentDistrict ||
+                      null
+                    }
+                  />
+
+                )
+              )}
+
+            </div>
+
+          ) : (
+
+            <div className="mt-16 rounded-[30px] border border-[#DDD6C2] bg-[#F8F6F2] p-12 text-center">
+
+              <p className="text-lg font-semibold text-slate-600">
+                No products found in the catalog.
+              </p>
+
+            </div>
+
+          )}
+
+
+          {/* VIEW ALL */}
+
+          <div className="mt-14 text-center">
 
             <Link
-              href={makeLink(`/items/${product.slug}`)}
-              className="mt-8 inline-flex items-center gap-2 font-semibold text-[#4B6E48] transition-all duration-300 hover:gap-3"
+              href={makeLink("/items")}
+              className="inline-flex items-center gap-2 rounded-2xl bg-[#4B6E48] px-8 py-4 font-semibold !text-white transition hover:bg-[#3F5D3C]"
             >
 
-              View Product
+              <span className="!text-white">
+                View All Products
+              </span>
 
-              <ArrowRight size={18} />
+              <ArrowRight
+                size={18}
+                className="!text-white"
+              />
 
             </Link>
 
@@ -635,31 +953,343 @@ export default function HeroSection({
 
         </div>
 
-      ))}
+      </section>
 
-    </div>
 
-    {/* Bottom Button */}
+      {/* ====================================================
+          WHY CHOOSE US
+      ==================================================== */}
 
-    <div className="mt-16 text-center">
+      <section className="section-padding bg-[#F8F6F2]">
 
-      <Link href={makeLink("/items")}>
+        <div className="container-custom">
 
-        <button className="inline-flex items-center gap-3 rounded-2xl bg-[#4B6E48] px-8 py-4 font-semibold text-white shadow-xl shadow-[#4B6E48]/20 transition-all duration-300 hover:-translate-y-1 hover:bg-[#3F5D3C] hover:shadow-[#4B6E48]/30">
+          <SectionTitle
+            badge="Why Work With Us"
+            title="Designed Around Real Laboratory Needs"
+            description="We focus on useful product information, responsive communication and sourcing support for routine diagnostic requirements."
+            center
+          />
 
-          View All Products
 
-          <ArrowRight size={18} />
+          <div className="mt-16 grid gap-8 md:grid-cols-2 lg:grid-cols-4">
 
-        </button>
+            {[
+              {
+                icon: (
+                  <ShieldCheck
+                    size={30}
+                  />
+                ),
+                title:
+                  "Application-Ready Products",
+                description:
+                  "Products presented with laboratory use and everyday testing requirements in mind.",
+              },
+              {
+                icon: (
+                  <Truck
+                    size={30}
+                  />
+                ),
+                title:
+                  "Order Coordination",
+                description:
+                  "Clear communication around quantities, availability and delivery requirements.",
+              },
+              {
+                icon: (
+                  <Wrench
+                    size={30}
+                  />
+                ),
+                title:
+                  "Application Guidance",
+                description:
+                  "Helpful information for understanding product specifications and choosing suitable options.",
+              },
+              {
+                icon: (
+                  <Activity
+                    size={30}
+                  />
+                ),
+                title:
+                  "Diagnostic Focus",
+                description:
+                  "A catalogue built around practical testing workflows and healthcare procurement needs.",
+              },
+            ].map(
+              (item, index) => (
 
-      </Link>
+                <div
+                  key={index}
+                  className="rounded-[30px] border border-[#DDD6C2] bg-white p-8 text-center shadow-lg shadow-[#DDD6C2] transition-all duration-300 hover:-translate-y-2 hover:shadow-xl"
+                >
 
-    </div>
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#F8F6F2] text-[#4B6E48]">
+                    {item.icon}
+                  </div>
 
-  </div>
+                  <h3 className="mt-6 text-xl font-bold text-slate-900">
+                    {item.title}
+                  </h3>
 
-</section>
+                  <p className="mt-3 leading-7 text-slate-600">
+                    {item.description}
+                  </p>
+
+                </div>
+
+              )
+            )}
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+      {/* ====================================================
+          WORKING PROCESS
+      ==================================================== */}
+
+      <section className="section-padding bg-white">
+
+        <div className="container-custom">
+
+          <SectionTitle
+            badge="How We Enquiry Support You"
+            title="From Requirement To Supply"
+            description="We keep product enquiries simple by understanding the need, presenting suitable choices and staying available for follow-up."
+            center
+          />
+
+
+          <div className="mt-16 grid gap-8 lg:grid-cols-3">
+
+            {[
+              {
+                step: "01",
+                title:
+                  "Understand",
+                desc:
+                  "We review the testing application, quantity and important specifications before suggesting suitable options.",
+              },
+              {
+                step: "02",
+                title:
+                  "Coordinate",
+                desc:
+                  "We coordinate the requested products and provide the information needed to proceed with procurement.",
+              },
+              {
+                step: "03",
+                title:
+                  "Enquiry Support",
+                desc:
+                  "We help with product questions and follow-up requirements after the enquiry or supply.",
+              },
+            ].map(
+              (item, index) => (
+
+                <div
+                  key={index}
+                  className="group relative overflow-hidden rounded-[30px] border border-[#DDD6C2] bg-white p-8 shadow-lg shadow-[#DDD6C2] transition-all duration-300 hover:-translate-y-2 hover:border-[#B2AC88] hover:shadow-2xl hover:shadow-[#B2AC88]"
+                >
+
+                  <span className="text-6xl font-black text-[#DDD6C2] transition group-hover:text-[#B2AC88]">
+                    {item.step}
+                  </span>
+
+                  <h3 className="mt-5 text-2xl font-bold text-slate-900">
+                    {item.title}
+                  </h3>
+
+                  <p className="mt-4 leading-7 text-slate-600">
+                    {item.desc}
+                  </p>
+
+                  <div className="mt-8 h-1 w-16 rounded-full bg-[#4B6E48] transition-all duration-300 group-hover:w-24" />
+
+                </div>
+
+              )
+            )}
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+      {/* ====================================================
+          AFTER SALES SUPPORT
+      ==================================================== */}
+
+      <section className="section-padding bg-gradient-to-b from-white to-[#F8F6F2]">
+
+        <div className="container-custom">
+
+          <div className="grid items-center gap-12 lg:grid-cols-2">
+
+            <div>
+
+              <span className="inline-block rounded-full border border-[#DDD6C2] bg-[#F8F6F2] px-5 py-2 font-semibold text-[#3F5D3C]">
+                After-Sales Enquiry Support
+              </span>
+
+              <h2 className="mt-5 text-3xl font-bold leading-tight text-slate-900 md:text-4xl">
+                Enquiry Help Beyond The Initial Order
+              </h2>
+
+              <p className="mt-5 text-lg leading-8 text-slate-600">
+                Biomedical equipment requires proper coordination, maintenance and technical attention throughout its working life. Our support approach is designed to help healthcare facilities maintain dependable equipment performance.
+              </p>
+
+
+              <div className="mt-8 space-y-5">
+
+                {[
+                  "Setup and application guidance",
+                  "Product-use information",
+                  "Technical enquiry coordination",
+                  "Product troubleshooting guidance",
+                  "Follow-up communication",
+                ].map(
+                  (item, index) => (
+
+                    <div
+                      key={index}
+                      className="flex items-start gap-4"
+                    >
+
+                      <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4B6E48] text-white">
+
+                        <ShieldCheck
+                          size={15}
+                        />
+
+                      </div>
+
+                      <p className="leading-7 text-slate-700">
+                        {item}
+                      </p>
+
+                    </div>
+
+                  )
+                )}
+
+              </div>
+
+            </div>
+
+
+            <div className="rounded-[35px] border border-[#DDD6C2] bg-white p-8 shadow-xl shadow-[#DDD6C2] md:p-10">
+
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#4B6E48] text-white shadow-lg shadow-[#B2AC88]">
+
+                <Headphones
+                  size={30}
+                />
+
+              </div>
+
+              <h3 className="mt-7 text-2xl font-bold text-slate-900">
+                Need Help Choosing A Testing Product?
+              </h3>
+
+              <p className="mt-4 leading-7 text-slate-600">
+                Whether you are sourcing strips, meters or other laboratory essentials, share your requirement and we can help you review the available options.
+              </p>
+
+
+              <div className="mt-8 grid gap-4 sm:grid-cols-2">
+
+                <div className="rounded-2xl bg-[#F8F6F2] p-5">
+
+                  <p className="text-sm font-semibold text-[#3F5D3C]">
+                    Testing Products
+                  </p>
+
+                  <p className="mt-2 font-bold text-slate-900">
+                    Specification Help
+                  </p>
+
+                </div>
+
+
+                <div className="rounded-2xl bg-[#F8F6F2] p-5">
+
+                  <p className="text-sm font-semibold text-[#3F5D3C]">
+                    Enquiry Support
+                  </p>
+
+                  <p className="mt-2 font-bold text-slate-900">
+                    Application Guidance
+                  </p>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+      {/* ====================================================
+          FINAL CONTENT
+      ==================================================== */}
+
+      <section className="section-padding bg-white">
+
+        <div className="container-custom max-w-5xl">
+
+          <div className="rounded-[35px] border border-[#DDD6C2] bg-gradient-to-br from-[#F8F6F2] via-white to-[#F8F6F2] p-8 text-center shadow-lg shadow-[#DDD6C2] md:p-12">
+
+            <h2 className="text-3xl font-bold text-slate-900 md:text-4xl">
+              A Practical Partner For Diagnostic Supplies
+            </h2>
+
+            <p className="mx-auto mt-5 max-w-3xl text-lg leading-8 text-slate-600">
+              From laboratory requirements and diagnostic equipment to installation coordination and ongoing assistance, we focus on delivering practical solutions that support efficient healthcare operations.
+            </p>
+
+
+            <div className="mt-8 flex flex-wrap justify-center gap-4">
+
+              <span className="rounded-full bg-white px-5 py-3 font-semibold text-[#3F5D3C] shadow-sm ring-1 ring-[#DDD6C2]">
+                Biomedical Testing Products
+              </span>
+
+              <span className="rounded-full bg-white px-5 py-3 font-semibold text-[#3F5D3C] shadow-sm ring-1 ring-[#DDD6C2]">
+                Laboratory Essentials
+              </span>
+
+              <span className="rounded-full bg-white px-5 py-3 font-semibold text-[#3F5D3C] shadow-sm ring-1 ring-[#DDD6C2]">
+                Technical Enquiry Support
+              </span>
+
+              <span className="rounded-full bg-white px-5 py-3 font-semibold text-[#3F5D3C] shadow-sm ring-1 ring-[#DDD6C2]">
+                Diagnostic Procurement
+              </span>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
     </>
   );
 }
