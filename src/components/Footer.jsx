@@ -1,8 +1,6 @@
 "use client";
-
-import { useEffect, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, doc, collection, getDoc, getDocs, addDoc, onSnapshot } from "@/lib/firestore-shim";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -18,16 +16,32 @@ import { fetchFullCatalog } from "@/lib/data-fetcher";
 
 const findContactField = (contactInfo, keywords, defaultValue = "") => {
   if (!Array.isArray(contactInfo)) return defaultValue;
-  const found = contactInfo.find(item => {
-    const label = String(item.label || "").toLowerCase().trim();
-    return keywords.some(keyword => label.includes(keyword.toLowerCase()));
+  const found = contactInfo.find((item) => {
+    const label = String(item?.label || item?.name || item?.key || "").toLowerCase().trim();
+    return keywords.some((keyword) => label.includes(keyword.toLowerCase()));
   });
-  return found ? found.value : defaultValue;
+  if (!found) return defaultValue;
+  if (Array.isArray(found.value)) {
+    return found.value.length > 0 ? found.value : defaultValue;
+  }
+  return found.value !== undefined && found.value !== null && found.value !== ""
+    ? found.value
+    : defaultValue;
 };
 
-const parsePhoneNumbers = (phoneStr) => {
-  if (!phoneStr) return [];
-  const str = typeof phoneStr === "string" ? phoneStr : String(phoneStr);
+const parsePhoneNumbers = (phoneInput) => {
+  if (!phoneInput) return [];
+  if (Array.isArray(phoneInput)) {
+    return phoneInput
+      .flatMap((item) =>
+        typeof item === "string"
+          ? item.split(/[\n,/;|]+|\s+and\s+|\s+&\s+/i)
+          : String(item || "")
+      )
+      .map((num) => num.trim())
+      .filter(Boolean);
+  }
+  const str = typeof phoneInput === "string" ? phoneInput : String(phoneInput);
   return str
     .split(/[\n,/;|]+|\s+and\s+|\s+&\s+/i)
     .map((num) => num.trim())
@@ -162,19 +176,20 @@ export default function Footer() {
   const phone = findContactField(
     contactInfo,
     ["phone", "call", "mobile", "contact", "tel"],
-    "+91 9983123469\n+91 9983333489"
+    "+91 8318368383"
   );
 
-  const email = findContactField(
+  const rawEmail = findContactField(
     contactInfo,
     ["email", "mail", "write"],
-    "rajbiosis@yahoo.in"
+    "mail@rajbiosis.com"
   );
+  const email = Array.isArray(rawEmail) ? (rawEmail[0] || "") : String(rawEmail || "");
 
   const address = findContactField(
     contactInfo,
     ["address", "location", "office", "business", "map", "place"],
-    "F-4, 1st Floor, Plot No. 16, D-Block Tagor Nagar, on Ajmer-Delhi, 200 Feet Bypass Rd, Jaipur, Rajasthan 302021"
+    "F-4, 1st Floor, Plot No. 16, D-Block Tagor Nagar, Ajmer-Delhi Bypass Rd, Jaipur, Rajasthan 302021, India"
   );
 
   const dynamicAddress = districtData

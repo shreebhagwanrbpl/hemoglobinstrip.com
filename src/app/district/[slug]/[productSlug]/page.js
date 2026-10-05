@@ -1,6 +1,6 @@
+import { WEBSITE_ID } from "@/lib/catalog-utils";
 import ProductDetails from "@/app/items/[slug]/ProductDetails";
-import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { db, doc, collection, getDoc, getDocs, addDoc, onSnapshot } from "@/lib/firestore-shim";
 import { fetchFullCatalog } from "@/lib/data-fetcher-server";
 import { getLocalDeliveryText, getLocalProductFAQs } from "@/lib/seo-engine";
 import { notFound } from "next/navigation";
@@ -12,7 +12,7 @@ export async function generateMetadata({ params }) {
   
   try {
     // 1. Fetch District Details
-    const districtSnap = await getDoc(doc(db, "websites", "hemoglobinstripcom", "districts", districtSlug));
+    const districtSnap = await getDoc(doc(db, "websites", WEBSITE_ID, "districts", districtSlug));
     if (!districtSnap.exists()) {
       return { title: "Product | Raj Biosis" };
     }
@@ -59,7 +59,7 @@ export default async function DistrictProductPage({ params }) {
   const { slug: districtSlug, productSlug } = await params;
   
   // Verify district exists
-  const districtSnap = await getDoc(doc(db, "websites", "hemoglobinstripcom", "districts", districtSlug));
+  const districtSnap = await getDoc(doc(db, "websites", WEBSITE_ID, "districts", districtSlug));
   if (!districtSnap.exists()) {
     notFound();
   }

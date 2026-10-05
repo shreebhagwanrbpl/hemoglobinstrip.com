@@ -1,27 +1,11 @@
 "use client";
-
-import { useEffect, useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import toast from "react-hot-toast";
 import { usePathname } from "next/navigation";
+import toast from "react-hot-toast";
+import { FaPlay, FaShareAlt, FaLink, FaWhatsapp, FaFacebook, FaInstagram } from "react-icons/fa";
+import { db, doc, collection, getDoc, getDocs, addDoc, onSnapshot } from "@/lib/firestore-shim";
 
-import {
-  FaPlay,
-  FaShareAlt,
-  FaWhatsapp,
-  FaFacebook,
-  FaInstagram,
-  FaLink,
-} from "react-icons/fa";
-
-import {
-  doc,
-  getDoc,
-  addDoc,
-  collection,
-} from "firebase/firestore";
-
-import { db } from "@/lib/firebase";
 import { fetchFullCatalog } from "@/lib/data-fetcher";
 import { Download } from "lucide-react";
 
@@ -44,16 +28,32 @@ const makeSlug = (text = "") =>
 
 const findContactField = (contactInfo, keywords, defaultValue = "") => {
   if (!Array.isArray(contactInfo)) return defaultValue;
-  const found = contactInfo.find(item => {
-    const label = String(item.label || "").toLowerCase().trim();
-    return keywords.some(keyword => label.includes(keyword.toLowerCase()));
+  const found = contactInfo.find((item) => {
+    const label = String(item?.label || item?.name || item?.key || "").toLowerCase().trim();
+    return keywords.some((keyword) => label.includes(keyword.toLowerCase()));
   });
-  return found ? found.value : defaultValue;
+  if (!found) return defaultValue;
+  if (Array.isArray(found.value)) {
+    return found.value.length > 0 ? found.value : defaultValue;
+  }
+  return found.value !== undefined && found.value !== null && found.value !== ""
+    ? found.value
+    : defaultValue;
 };
 
-const parsePhoneNumbers = (phoneStr) => {
-  if (!phoneStr) return [];
-  const str = typeof phoneStr === "string" ? phoneStr : String(phoneStr);
+const parsePhoneNumbers = (phoneInput) => {
+  if (!phoneInput) return [];
+  if (Array.isArray(phoneInput)) {
+    return phoneInput
+      .flatMap((item) =>
+        typeof item === "string"
+          ? item.split(/[\n,/;|]+|\s+and\s+|\s+&\s+/i)
+          : String(item || "")
+      )
+      .map((num) => num.trim())
+      .filter(Boolean);
+  }
+  const str = typeof phoneInput === "string" ? phoneInput : String(phoneInput);
   return str
     .split(/[\n,/;|]+|\s+and\s+|\s+&\s+/i)
     .map((num) => num.trim())
@@ -82,10 +82,10 @@ export default function ProductDetails({ slug }) {
   const [brochureImage, setBrochureImage] = useState("");
 
   const [contactData, setContactData] = useState({
-    phone: "+91 9983123469\n+91 9983333489",
-    email: "rajbiosis@yahoo.in",
+    phone: "+91 8318368383",
+    email: "mail@rajbiosis.com",
     address:
-      "F-4, 1st Floor, Plot No. 16, D-Block Tagor Nagar, on Ajmer-Delhi, 200 Feet Bypass Rd, Jaipur, Rajasthan 302021",
+      "F-4, 1st Floor, Plot No. 16, D-Block Tagor Nagar, Ajmer-Delhi Bypass Rd, Jaipur, Rajasthan 302021, India",
   });
 
   const pathname = usePathname();
@@ -201,15 +201,15 @@ export default function ProductDetails({ slug }) {
           setContactData({
             phone:
               phoneVal ||
-              "+91 9983123469\n+91 9983333489",
+              "+91 8318368383",
 
             email:
-              emailVal ||
-              "rajbiosis@yahoo.in",
+              (Array.isArray(emailVal) ? emailVal[0] : emailVal) ||
+              "mail@rajbiosis.com",
 
             address:
               addressVal ||
-              "F-4, 1st Floor, Plot No. 16, D-Block Tagor Nagar, on Ajmer-Delhi, 200 Feet Bypass Rd, Jaipur, Rajasthan 302021",
+              "F-4, 1st Floor, Plot No. 16, D-Block Tagor Nagar, Ajmer-Delhi Bypass Rd, Jaipur, Rajasthan 302021, India",
           });
 
         }

@@ -21,4 +21,4 @@ export default async function Page({ params }) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 
   return <ServicesPage city={city} />;
-}
+}

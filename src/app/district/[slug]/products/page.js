@@ -1,6 +1,6 @@
+import { WEBSITE_ID } from "@/lib/catalog-utils";
 import ProductsPage from "@/app/items/page";
-import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { db, doc, collection, getDoc, getDocs, addDoc, onSnapshot } from "@/lib/firestore-shim";
 import { notFound } from "next/navigation";
 
 export const revalidate = 3600;
@@ -9,7 +9,7 @@ export async function generateMetadata({ params }) {
   const { slug } = await params;
   
   try {
-    const snap = await getDoc(doc(db, "websites", "hemoglobinstripcom", "districts", slug));
+    const snap = await getDoc(doc(db, "websites", WEBSITE_ID, "districts", slug));
     if (!snap.exists()) {
       return { title: "Products | Raj Biosis" };
     }
@@ -43,7 +43,7 @@ export async function generateMetadata({ params }) {
 export default async function DistrictProductsPage({ params }) {
   const { slug } = await params;
   
-  const snap = await getDoc(doc(db, "websites", "hemoglobinstripcom", "districts", slug));
+  const snap = await getDoc(doc(db, "websites", WEBSITE_ID, "districts", slug));
   if (!snap.exists()) {
     notFound();
   }

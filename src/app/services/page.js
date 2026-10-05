@@ -1,4 +1,8 @@
 "use client";
+import { useState, useEffect } from "react";
+import { db, doc, collection, getDoc, getDocs, addDoc, onSnapshot } from "@/lib/firestore-shim";
+import SectionTitle from "@/components/SectionTitle";
+import ServiceCard from "@/components/ServiceCard";
 import {
   Microscope,
   FlaskConical,
@@ -8,13 +12,6 @@ import {
   Activity,
 } from "lucide-react";
 
-
-import SectionTitle from "@/components/SectionTitle";
-import ServiceCard from "@/components/ServiceCard";
-// import CTASection from "@/components/CTASection";
-import { useEffect, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 export default function ServicesPage() {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);

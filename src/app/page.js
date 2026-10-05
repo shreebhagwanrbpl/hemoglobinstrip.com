@@ -1,12 +1,10 @@
 "use client";
-
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, doc, collection, getDoc, getDocs, addDoc, onSnapshot } from "@/lib/firestore-shim";
 import { fetchFullCatalog } from "@/lib/data-fetcher";
 
 import SectionTitle from "@/components/SectionTitle";

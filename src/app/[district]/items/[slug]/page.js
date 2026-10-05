@@ -1,6 +1,6 @@
+import { WEBSITE_ID } from "@/lib/catalog-utils";
 import ProductDetails from "../../../items/[slug]/ProductDetails";
-import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { db, doc, collection, getDoc, getDocs, addDoc, onSnapshot } from "@/lib/firestore-shim";
 import { fetchFullCatalog } from "@/lib/data-fetcher-server";
 
 export const revalidate = 3600;
@@ -9,7 +9,7 @@ export async function generateMetadata({ params }) {
     const { slug, district } = await params;
 
     try {
-        const districtSnap = await getDoc(doc(db, "websites", "hemoglobinstripcom", "districts", district));
+        const districtSnap = await getDoc(doc(db, "websites", WEBSITE_ID, "districts", district));
         const districtData = districtSnap.exists() ? districtSnap.data() : null;
         const city = districtData?.district || district.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
         const state = districtData?.state || "India";
@@ -54,4 +54,4 @@ export default async function Page({ params }) {
             district={district}
         />
     );
-}
+}

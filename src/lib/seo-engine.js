@@ -40,14 +40,15 @@ export function getLocalDeliveryText(district, state) {
 /**
  * Generates structured LocalBusiness schema details if appropriate
  */
-export function getLocalBusinessSchema(district, state, currentUrl) {
+export function getLocalBusinessSchema(district, state, currentUrl, phone = "+918318368383", email = "mail@rajbiosis.com") {
   return {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
     "name": `Biomedical Equipment Supplier in ${district} | Raj Biosis`,
     "description": getLocalDeliveryText(district, state),
     "url": currentUrl,
-    "telephone": "+919983123469",
+    "telephone": phone,
+    "email": email,
     "address": {
       "@type": "PostalAddress",
       "addressLocality": district,
@@ -82,7 +83,7 @@ export function getLocalProductFAQs(productName, district, state) {
     },
     {
       question: `How can I request a quotation or price list for ${productName} in ${district}?`,
-      answer: `You can submit a query using the contact form on this page or email us at rajbiosis@yahoo.in. Our team will prepare a custom quotation including delivery charges to ${district} and send it to you within 24 hours.`
+      answer: `You can submit a query using the contact form on this page or email us at mail@rajbiosis.com. Our team will prepare a custom quotation including delivery charges to ${district} and send it to you within 24 hours.`
     }
   ];
 }
